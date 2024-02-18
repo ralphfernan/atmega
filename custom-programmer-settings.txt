@@ -1,0 +1,24 @@
+#------------------------------------------------------------
+# ralphusb - add this section to avrdude.conf
+#------------------------------------------------------------
+
+# Using RXD is currently not supported.
+# Using RI is not supported under Win32 but is supported under Posix.
+# ~ ! mean inverted.
+# New terminology: mosi==sdo and miso==sdi
+
+# CP210x design 
+# reset=!dtr sck=!tx sdo=!rts sdi=!cts
+# avr is master; sdo = mosi
+
+programmer # ralphusb
+    id                     = "ralphusb";
+    desc                   = "CP210x TTL rst:!dtr sck:!tx mosi=sdo:!rts miso=sdi:!cts";
+    type                   = "serbb";
+    prog_modes             = PM_TPI | PM_ISP;
+    connection_type        = serial;
+    reset                  = ~4;
+    sck                    = ~3;
+    sdo                    = ~7;
+    sdi                    = ~8;
+;
