@@ -1,11 +1,10 @@
-﻿
-UBUNTU Microchip ATmega328 Programming via the Serial Peripheral Interface
+ATmega328 Programming with only a USB-to-UART adapter and the chip itself
 
 Components:
 1. A CP2102 (CP210x) USB-UART/TTL adapter.  This includes Tx, DTR, CTS, RTS, 5v and GND.
 2. The microchip (ATMega 328)
+3. Ubuntu/Linux PC
 
-FAQ:
 No other resistors/capacitors/crystals/parts are needed for programming.  See circuit diagram.  For checking the blink program after programming the chip, you need an led and a current limiting resistor (few hundred ohms to couple of kilo-ohms).
 
 Most recent Ubuntu versions should already include the CP210x USB driver.  
@@ -15,11 +14,19 @@ There is no need to program a bootloader.  In this case, the program (.hex) is u
 If you want to upload your .hex program through some other interface besides SPI, then the specifications say “The On-chip ISPvFlash allows the program memory to be reprogrammed In-System through an SPI serial interface, by a conventional non-volatile memory programmer, or by an On-chip Boot program running on the AVR core. The Boot program can use any interface to download the application program in the Application Flash memory.”  
 (This is where a bootloader is used.)
 
+VERIFYING THE HARDWARE CONNECTION
+1) Reading the mega's ID/signature:
+$ sudo avrdude -C ../avrdude.conf -c ralphusb -P cp210x -p atmega328p
+avrdude: AVR device initialized and ready to accept instructions
+avrdude: device signature = 0x1e9514 (probably m328)
+avrdude error: expected signature for ATmega328P is 1E 95 0F
+        double check chip or use -F to override this check
+
+avrdude done.  Thank you.
+
+2) Reading the fuse values:
 To check the fresh chip’s low fuse (for high fuse – hfuse, extended fuse – efuse):
-
-
 ~/avrprojects$ sudo avrdude -C avrdude.conf -c ralphusb -P cp210x -p atmega328 -U lfuse:r:-:h
-[sudo] password for:
 avrdude: AVR device initialized and ready to accept instructions
 avrdude: device signature = 0x1e9514 (probably m328)
 
@@ -32,10 +39,63 @@ avrdude done.  Thank you.
 
 Note: the result 0x62 == b’0110 0010’ is the default.  See references below; Microchip specifications.  This specifies that the default internal 8MHz clock is divided by 8, i.e. a 1 MHz effective clock for a factory-fresh chip.
 
-cd ~/avrprojects/sketches/blink-ATmega328p
+UPLOADING THE HEX FILE to the AtMega328
+(See below for producing the hex file from the Arduino IDE)
+cd ~/avrprojects/sketches # Note: the location of avrdude.conf with the settings for custom programmer 'ralphusb' is one directory up.
+Command options:
+-C specifies the location of the programmer configuration file
+-c the name of the custom programmer
+-P the port.  avrdude will suggest this if you leave it out.
+-p the part being programmed.  E.g. for ATtiny85, use -p t85
+-F for atmega328p, the programmer expects 0x1e 95 0F, since the actual device id does not match, use the -F to suppress the warning.
+Guessing that the signature ending in 0F is for chips with the bootloader?
+-i delay in microsecs.
+-U memory operation w == write, r == read
 
-$ sudo avrdude -C ../../avrdude.conf -c ralphusb -P cp210x -p atmega328 -i 16 -D -U flash:w:blink.hex
 
+$ sudo avrdude -C ../avrdude.conf -c ralphusb -P cp210x -p atmega328p -F -i 16 -U flash:w:sketch_blink_millis.ino.hex
+avrdude: AVR device initialized and ready to accept instructions
+avrdude: device signature = 0x1e9514 (probably m328)
+avrdude warning: expected signature for ATmega328P is 1E 95 0F
+avrdude: Note: flash memory has been specified, an erase cycle will be performed.
+         To disable this feature, specify the -D option.
+avrdude: erasing chip
+
+avrdude: processing -U flash:w:sketch_blink_millis.ino.hex:i
+avrdude: reading input file sketch_blink_millis.ino.hex for flash
+         with 860 bytes in 1 section within [0, 0x35b]
+         using 7 pages and 36 pad bytes
+avrdude: writing 860 bytes flash ...
+Writing | ################################################## | 100% 58.20 s 
+avrdude: 860 bytes of flash written
+avrdude: verifying flash memory against sketch_blink_millis.ino.hex
+Reading | ################################################## | 100% 57.93 s 
+avrdude: 860 bytes of flash verified
+
+avrdude done.  Thank you.
+
+VERIFYING NUMBER OF BYTES IN THE HEX:
+$ size -f sketch_blink_millis.ino.hex 
+   text	   data	    bss	    dec	    hex	filename
+      0	    860	      0	    860	    35c	sketch_blink_millis.ino.hex
+Alternative way:
+1. The first 2 digits after the : in the hex file, e.g. :10 = 16 bytes
+2. E.g. the above hex file has 53 such lines: 53x16 bytes, and there is 1 line with :0C (12 bytes)
+Total = 53x16+12 = 848 + 12 = 860  
+
+ARDUINO IDE
+Terminology:
+1. A sketch is a C program file, for example to blink an LED.
+2. The PIN definitions are macros that correspond to the programmer selected.
+ e.g. for "Uno", LED_BUILTIN is pin 13 on the Uno board, which is PB5 on the AtMega328
+
+Once you have written the C file and selected the programmer (Uno) in the IDE
+> run Sketch->Verify/Compile.  Shows how many bytes to be written.
+> Export Compiled Binary
+> Show Sketch Folder.  
+The binary is in the build sub-folder of the above folder.  A variant includes the bootloader.
+
+    
 UBUNTU 20.x Setup
 
 CP210x addition to avrdude.conf
